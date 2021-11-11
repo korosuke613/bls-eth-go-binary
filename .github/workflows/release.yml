@@ -1,0 +1,104 @@
+name: Release
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  archive-binaries:
+    name: archive binaries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, macos-11]
+    steps:
+      - uses: actions/checkout@v2
+      - run: go test -v ./bls
+      - run: git submodule update --init --recursive
+      - name: build on linux with x86_64
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt install nasm
+          make clean
+          make CXX=clang++
+          go test -v ./bls
+      - name: build on linux with arm64
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt install -y make clang libstdc++-8-dev-arm64-cross
+          make clean
+          make CXX=clang++ COMPILE_TARGET=linux-arm64
+      - name: upload binary for linux with x86-64
+        uses: actions/upload-artifact@v2
+        with:
+          name: linux-amd64-libbls384_256.a
+          path: bls/lib/linux/amd64/libbls384_256.a
+      - name: upload binary for linux with arm64
+        uses: actions/upload-artifact@v2
+        with:
+          name: linux-arm64-libbls384_256.a
+          path: bls/lib/linux/arm64/libbls384_256.a
+
+      - name: build on mac with x86_64
+        if: runner.os == 'macOS'
+        run: |
+          brew install nasm
+          make clean
+          make
+          go test -v ./bls
+      - name: build on mac with arm64
+        if: runner.os == 'macOS'
+        run: |
+          make clean
+          make CXX=clang++ COMPILE_TARGET=mac-m1
+      - name: upload binary for mac with x86-64
+        uses: actions/upload-artifact@v2
+        with:
+          name: darwin-amd64-libbls384_256.a
+          path: bls/lib/darwin/amd64/libbls384_256.a
+      - name: upload binary for mac with arm64
+        uses: actions/upload-artifact@v2
+        with:
+          name: darwin-arm64-libbls384_256.a
+          path: bls/lib/darwin/arm64/libbls384_256.a
+
+  commit-binaries:
+    name: commit binaries
+    runs-on: ubuntu-latest
+    needs: archive-binaries
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: 'master'
+      - uses: actions/download-artifact@v2
+        with:
+          name: linux-amd64-libbls384_256.a
+      - name: mv binary
+        run: mv libbls384_256.a  bls/lib/linux/amd64/libbls384_256.a
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: linux-arm64-libbls384_256.a
+      - name: mv binary
+        run: mv libbls384_256.a  bls/lib/linux/arm64/libbls384_256.a
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: darwin-amd64-libbls384_256.a
+      - name: mv binary
+        run: mv libbls384_256.a  bls/lib/darwin/amd64/libbls384_256.a
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: darwin-arm64-libbls384_256.a
+      - name: mv binary
+        run: mv libbls384_256.a  bls/lib/darwin/arm64/libbls384_256.a
+
+      - name: commit binaries
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add bls/lib/*
+          git status
+          git commit -m "[skip ci] add binaries"
+          git push origin master
