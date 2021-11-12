@@ -109,7 +109,7 @@ jobs:
           # check change binaries
           if [ -z "$(git status --porcelain)" ]; then
             echo "No change binaries"
-            return 0
+            exit 0
           fi
 
           # commit binaries
