@@ -1,11 +1,15 @@
+# Commit the binaries under `bls/lib/`.
+# - If a pull request is made with release_os in the branch name, it will be committed to that branch.
+# - If you push a tag starting with `v', it will be merged into the master branch.
+# - If there are no differences in the binaries, they will not be committed.
+# - Windows binaries are not yet supported.
+
 name: Release
 on:
   push:
     tags:
       - v*
   pull_request:
-    branches:
-      - master
 
 jobs:
   archive-binaries:
@@ -14,7 +18,10 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-20.04, macos-11]
+
+    # If `release_os` is not included in the branch name, the release will not be executed
     if: contains(github.head_ref, 'release_os')
+
     steps:
       - uses: actions/checkout@v2
       - run: go test -v ./bls
@@ -44,7 +51,6 @@ jobs:
         with:
           os: linux
           arch: arm64
-
       - name: "[darwin/amd64] build"
         if: runner.os == 'macOS'
         run: |
@@ -103,7 +109,6 @@ jobs:
         with:
           os: darwin
           arch: arm64
-
       - name: commit binaries
         run: |
           # check change binaries
